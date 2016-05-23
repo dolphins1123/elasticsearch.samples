@@ -13,13 +13,21 @@ namespace ElasticsearchSamples
         private ElasticClient myindexClient;
 
         [TestMethod]
-        public void Test_CreateSingleNodeConnection()
+        public void TestMethod1()
         {
             this.myindexClient = this.ConnectToSingleNode();
 
-            this.IndexDocument();
+            var searchedTextItems = this.QueryByTerm();
 
-            this.IndexMultipleDocuments();
+            searchedTextItems = this.QueryByString();
+
+            searchedTextItems = this.QueryByMatch();
+
+            searchedTextItems = this.QueryByMatchPhrase();
+
+            searchedTextItems = this.QueryByMultipleConditions();
+
+            searchedTextItems = this.QueryWithSorting();
         }
 
         private ElasticClient ConnectToSingleNode()
@@ -43,58 +51,104 @@ namespace ElasticsearchSamples
             return new ElasticClient(connectionSetting);
         }
 
-        private void IndexDocument()
+        private IEnumerable<TextItem> QueryByTerm()
         {
-            // 假設有一個 TextItem 的 object
-            TextItem textItem = new TextItem()
-            {
-                Id = Guid.NewGuid(),
-                Summary = "I'm summary.",
-                Content = "I'm content.",
-                AuthorId = "99999",
-                AuthorName = "Dotblogs",
-                CreatedTime = DateTime.Now,
-                ModifiedTime = DateTime.Now
-            };
-
-            // 直接呼叫 Index 將 object 給入即可。
-            // 官網建議自行指定 document Id，不指定的話預設 Elasticsearch 會自己給。
-            // type 如果不指定，預設就是類別名稱。
-            this.myindexClient.Index(textItem, indexDescriptor => indexDescriptor.Id(textItem.Id.ToString()));
+            // 搜尋條件為 Id 這個欄位的值等於 2d50d70d-03f9-4769-8592-20de15bc6d0a
+            return
+                this.myindexClient.Search<TextItem>(s => s
+                    .From(0)    // 從第 0 筆
+                    .Size(10)   // 抓 10 筆
+                    .Query(q =>
+                        q.Term(p => p.Id, "2d50d70d-03f9-4769-8592-20de15bc6d0a")))
+                .Hits
+                .Select(h => h.Source);
         }
 
-        private void IndexMultipleDocuments()
+        private IEnumerable<TextItem> QueryByString()
         {
-            // 假設我產生了多個 TextItem
-            List<TextItem> textItems = CreateTextItems();
-
-            // 呼叫 Bulk 方法，給入一個 BulkRequest object，指定 BulkRequest.Operations 為 List<IBulkOperation<TextItem>>。
-            this.myindexClient.Bulk(new BulkRequest()
-            {
-                Operations = textItems.Select(t => new BulkIndexOperation<TextItem>(t) { Id = t.Id.ToString() } as IBulkOperation).ToList()
-            });
+            // 搜尋條件為 Content 這個欄位的值包含 "馬英九"
+            return
+                this.myindexClient.Search<TextItem>(s => s
+                    .From(0)    // 從第 0 筆
+                    .Size(10)   // 抓 10 筆
+                    .Query(q =>
+                        q.QueryString(qs => qs.OnFields(p => p.Content).Query("\"馬英九\""))))
+                .Hits
+                .Select(h => h.Source);
         }
 
-        private static List<TextItem> CreateTextItems()
+        private IEnumerable<TextItem> QueryByMatch()
         {
-            List<TextItem> textItems = new List<TextItem>();
+            // 搜尋條件為 Content 這個欄位的值包含 "馬" "英" "九"
+            //return
+            //    this.myindexClient.Search<TextItem>(s => s
+            //        .From(0)    // 從第 0 筆
+            //        .Size(10)   // 抓 10 筆
+            //        .Query(q =>
+            //            q.QueryString(qs => qs.OnFields(p => p.Content).Query("馬英九"))))
+            //    .Hits
+            //    .Select(h => h.Source);
 
-            for (int index = 0; index < 10; index++)
-            {
-                textItems.Add(
-                    new TextItem()
-                    {
-                        Id = Guid.NewGuid(),
-                        Summary = "I'm summary.",
-                        Content = "I'm content.",
-                        AuthorId = "99999",
-                        AuthorName = "Dotblogs",
-                        CreatedTime = DateTime.Now,
-                        ModifiedTime = DateTime.Now
-                    });
-            }
+            // 上述條件相當於 Content 這個欄位的值 Match 馬英九
+            return
+                this.myindexClient.Search<TextItem>(s => s
+                    .From(0)    // 從第 0 筆
+                    .Size(10)   // 抓 10 筆
+                    .Query(q =>
+                        q.Match(qs => qs.OnField(p => p.Content).Query("馬英九"))))
+                .Hits
+                .Select(h => h.Source);
+        }
 
-            return textItems;
+        private IEnumerable<TextItem> QueryByMatchPhrase()
+        {
+            // 搜尋條件為 Content 這個欄位的值包含 "馬英九"
+            //return
+            //    this.myindexClient.Search<TextItem>(s => s
+            //        .From(0)    // 從第 0 筆
+            //        .Size(10)   // 抓 10 筆
+            //        .Query(q =>
+            //            q.QueryString(qs => qs.OnFields(p => p.Content).Query("\"馬英九\""))))
+            //    .Hits
+            //    .Select(h => h.Source);
+
+            // 上述條件相當於 Content 這個欄位的值 MatchPhrase 馬英九
+            return
+                this.myindexClient.Search<TextItem>(s => s
+                    .From(0)    // 從第 0 筆
+                    .Size(10)   // 抓 10 筆
+                    .Query(q =>
+                        q.MatchPhrase(qs => qs.OnField(p => p.Content).Query("馬英九"))))
+                .Hits
+                .Select(h => h.Source);
+        }
+
+        private IEnumerable<TextItem> QueryByMultipleConditions()
+        {
+            // 搜尋條件為 Content 這個欄位的值包含 "馬英九" 而且也包含 "吳敦義"
+            return
+                this.myindexClient.Search<TextItem>(s => s
+                    .From(0)    // 從第 0 筆
+                    .Size(10)   // 抓 10 筆
+                    .Query(q =>
+                        q.QueryString(qs => qs.OnFields(p => p.Content).Query("\"馬英九\""))
+                        && q.QueryString(qs => qs.OnFields(p => p.Content).Query("\"吳敦義\""))))
+                .Hits
+                .Select(h => h.Source);
+        }
+
+        private IEnumerable<TextItem> QueryWithSorting()
+        {
+            // 搜尋條件為 Content 這個欄位的值包含 "馬英九"，並且依 CreateTime 降冪排序搜尋結果。
+            return
+                this.myindexClient.Search<TextItem>(s => s
+                    .From(0)    // 從第 0 筆
+                    .Size(10)   // 抓 10 筆
+                    .Query(q =>
+                        q.QueryString(qs => qs.OnFields(p => p.Content).Query("\"馬英九\"")))
+                    .SortDescending(p => p.CreatedTime))
+                .Hits
+                .Select(h => h.Source);
         }
     }
 }
