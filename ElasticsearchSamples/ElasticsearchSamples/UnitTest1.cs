@@ -19,7 +19,7 @@ namespace ElasticsearchSamples
 
             var searchedTextItems = this.QueryByTerm();
 
-            searchedTextItems = this.QueryByString();
+            searchedTextItems = this.QueryByKeyword();
 
             searchedTextItems = this.QueryByMatch();
 
@@ -64,7 +64,7 @@ namespace ElasticsearchSamples
                 .Select(h => h.Source);
         }
 
-        private IEnumerable<TextItem> QueryByString()
+        private IEnumerable<TextItem> QueryByKeyword()
         {
             // 搜尋條件為 Content 這個欄位的值包含 "馬英九"
             return
