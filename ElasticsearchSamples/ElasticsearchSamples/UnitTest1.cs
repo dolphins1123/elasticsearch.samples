@@ -17,9 +17,11 @@ namespace ElasticsearchSamples
         {
             this.myindexClient = this.ConnectToSingleNode();
 
-            this.IndexDocument();
+            var searchedTextItems = this.QueryByKeyword();
 
-            this.IndexMultipleDocuments();
+            searchedTextItems = this.QueryByKeywordUseFields();
+
+            this.DeleteDocuments();
         }
 
         private ElasticClient ConnectToSingleNode()
@@ -43,58 +45,61 @@ namespace ElasticsearchSamples
             return new ElasticClient(connectionSetting);
         }
 
-        private void IndexDocument()
+        private IEnumerable<TextItemViewModel> QueryByKeyword()
         {
-            // 假設有一個 TextItem 的 object
-            TextItem textItem = new TextItem()
-            {
-                Id = Guid.NewGuid(),
-                Summary = "I'm summary.",
-                Content = "I'm content.",
-                AuthorId = "99999",
-                AuthorName = "Dotblogs",
-                CreatedTime = DateTime.Now,
-                ModifiedTime = DateTime.Now
-            };
-
-            // 直接呼叫 Index 將 object 給入即可。
-            // 官網建議自行指定 document Id，不指定的話預設 Elasticsearch 會自己給。
-            // type 如果不指定，預設就是類別名稱。
-            this.myindexClient.Index(textItem, indexDescriptor => indexDescriptor.Id(textItem.Id.ToString()));
+            // 搜尋條件為 Content 這個欄位的值包含 "馬英九"
+            return
+                this.myindexClient.Search<TextItemViewModel>(s => s
+                    .From(0)    // 從第 0 筆
+                    .Size(10)   // 抓 10 筆
+                    .Type("textitem")
+                    .Query(q =>
+                        q.QueryString(qs => qs.OnFields(new string[] { "content" }).Query("\"馬英九\""))))
+                .Hits
+                .Select(h => h.Source);
         }
 
-        private void IndexMultipleDocuments()
+        private IEnumerable<TextItemViewModel> QueryByKeywordUseFields()
         {
-            // 假設我產生了多個 TextItem
-            List<TextItem> textItems = CreateTextItems();
-
-            // 呼叫 Bulk 方法，給入一個 BulkRequest object，指定 BulkRequest.Operations 為 List<IBulkOperation<TextItem>>。
-            this.myindexClient.Bulk(new BulkRequest()
-            {
-                Operations = textItems.Select(t => new BulkIndexOperation<TextItem>(t) { Id = t.Id.ToString() } as IBulkOperation).ToList()
-            });
+            // 搜尋條件為 Content 這個欄位的值包含 "馬英九"
+            return
+                this.myindexClient.Search<TextItemViewModel>(s => s
+                    .From(0)    // 從第 0 筆
+                    .Size(10)   // 抓 10 筆
+                    .Type("textitem")
+                    .Query(q =>
+                        q.QueryString(qs => qs.OnFields(new string[] { "content" }).Query("\"馬英九\"")))
+                    .Fields(p => p.Id, p => p.AuthorId, p => p.AuthorName, p => p.Summary))
+                .Hits
+                .Where(h => h.Fields.FieldValuesDictionary != null && h.Fields.FieldValuesDictionary.Count > 0)
+                .Select(h => ReflectTo<TextItemViewModel>(h.Fields.FieldValuesDictionary));
         }
 
-        private static List<TextItem> CreateTextItems()
+        private void DeleteDocuments()
         {
-            List<TextItem> textItems = new List<TextItem>();
+            var deletedResult =
+                this.myindexClient.DeleteByQuery<TextItem>(d =>
+                    d.Query(q =>
+                        q.Term(p => p.AuthorId, "123456")
+                ));
+        }
 
-            for (int index = 0; index < 10; index++)
+        private static T ReflectTo<T>(IDictionary<string, object> dict)
+        {
+            Type type = typeof(T);
+            var obj = Activator.CreateInstance(type);
+
+            foreach (var fv in dict)
             {
-                textItems.Add(
-                    new TextItem()
-                    {
-                        Id = Guid.NewGuid(),
-                        Summary = "I'm summary.",
-                        Content = "I'm content.",
-                        AuthorId = "99999",
-                        AuthorName = "Dotblogs",
-                        CreatedTime = DateTime.Now,
-                        ModifiedTime = DateTime.Now
-                    });
+                var property = type.GetProperties().Where(p => p.Name.ToLower() == fv.Key.ToLower()).FirstOrDefault();
+
+                if (property != null && fv.Value != null)
+                {
+                    property.SetValue(obj, ((Newtonsoft.Json.Linq.JArray)fv.Value).First.ToObject<object>());
+                }
             }
 
-            return textItems;
+            return (T)obj;
         }
     }
 }
