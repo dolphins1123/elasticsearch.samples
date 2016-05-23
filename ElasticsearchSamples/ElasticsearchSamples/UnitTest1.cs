@@ -13,7 +13,7 @@ namespace ElasticsearchSamples
         private ElasticClient myindexClient;
 
         [TestMethod]
-        public void Test_CreateSingleNodeConnection()
+        public void TestMethod1()
         {
             this.myindexClient = this.ConnectToSingleNode();
 
