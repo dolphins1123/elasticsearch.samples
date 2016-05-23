@@ -1,7 +1,8 @@
 # elasticsearch.samples
 
-- Create single node connection sample code.
-- Create connection pool connection sample code.
-- Index a document sample code.
-- Index multiple documents sample code.
-- Search and sorting sample code in 'search_sorting' branch.
+- Query by Term sample code.
+- Query by keyword sample code.
+- Query by Match sample code.
+- Query by MatchPhrase sample code.
+- Query by multiple conditions sample code.
+- Query with sorting sample code.
