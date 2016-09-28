@@ -79,7 +79,7 @@ namespace ElasticsearchSamples
 
         private IEnumerable<TextItem> QueryByMatch()
         {
-            // 搜尋條件為 Content 這個欄位的值包含 "馬" "英" "九"
+            // 搜尋條件為 Content 這個欄位的值包含 "馬" 或 "英" 或 "九"
             //return
             //    this.myindexClient.Search<TextItem>(s => s
             //        .From(0)    // 從第 0 筆
